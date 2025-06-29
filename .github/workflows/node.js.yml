@@ -60,8 +60,11 @@ jobs:
             name=$(echo "$row" | jq -r '.name')
             message=$(echo "$row" | jq -r '.message')
     
-            # 行番号の正規表現にヒットする最初の1行を抽出（例: __test__/service.test.ts:21:30）
+            # フルパス中の ts ファイル位置を抽出し、相対パスに変換
             loc=$(echo "$message" | grep -Eo '[^ ]+\.ts:[0-9]+:[0-9]+' | head -n 1)
+    
+            # 相対パス（test/から始まる）に変換
+            loc=$(echo "$loc" | sed -E 's|.*/(test/[^:]+:[0-9]+:[0-9]+)|\1|')
     
             # ヒットしなければ補足メッセージ
             if [ -z "$loc" ]; then
@@ -72,14 +75,12 @@ jobs:
           done
     
           echo "" >> result.md
-          echo "> ※ File:Line列はテスト失敗時のソースコード上の位置（ファイル:行:列）を出力します。" >> result.md
+          echo "> ※ File:Line列はテスト失敗時のソースコード上の相対パス（ファイル:行:列）を出力します。" >> result.md
           echo "> Jestのエラーメッセージから抽出しているため、正確な位置が得られない場合もあります。" >> result.md
         fi
     
         echo "summary_file=result.md" >> $GITHUB_OUTPUT
-
-
-  
+ 
     # 生成したMarkdownファイルをアーティファクトとして保存（必要に応じて）
     - name: Upload job summary
       uses: actions/upload-artifact@v4
