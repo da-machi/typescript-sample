@@ -1,6 +1,20 @@
 # GitHub Actions CI ワークフロー設定内容説明
 
 このリポジトリで設定されているGitHub Actionsのワークフロー **Node.js CI** は、Node.jsプロジェクトに対して自動でビルドとテストを実行し、テスト結果を分かりやすくまとめてGitHubのUIに表示します。
+---
+
+## ファイルの設置場所について
+
+GitHub Actionsのワークフロー設定ファイルは、リポジトリ内の以下のディレクトリに配置します。
+
+```
+.github/workflows/
+```
+
+例えば、今回のNode.js CI設定は以下のパスに配置します。
+```
+.github/workflows/nodejs-ci.yml
+```
 
 ---
 
