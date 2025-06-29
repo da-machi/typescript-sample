@@ -45,7 +45,7 @@ jobs:
           echo "| Suite (Describe) | Test Name | File:Line |" >> result.md
           echo "| ---------------- | --------- | --------- |" >> result.md
     
-          jq -r '
+          jq -c '
             .testResults[]
             | .testFilePath as $file
             | .assertionResults[]
@@ -55,7 +55,7 @@ jobs:
                 name: .fullName,
                 message: (.failureMessages | join("\n"))
               }
-          ' jest-results.json | jq -s '.[]' | while read -r row; do
+          ' jest-results.json | while read -r row; do
             suite=$(echo "$row" | jq -r '.suite')
             name=$(echo "$row" | jq -r '.name')
             message=$(echo "$row" | jq -r '.message')
@@ -77,6 +77,7 @@ jobs:
         fi
     
         echo "summary_file=result.md" >> $GITHUB_OUTPUT
+
 
   
     # 生成したMarkdownファイルをアーティファクトとして保存（必要に応じて）
