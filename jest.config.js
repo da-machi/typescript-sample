@@ -11,5 +11,4 @@ module.exports = {
   transform: {
     ...tsJestTransformCfg,
   },
-  testResultsProcessor: "jest-sonar-reporter" // 必要なら
 };
