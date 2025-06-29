@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "main": "dist/handler.js",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "test": "jest"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.149",
