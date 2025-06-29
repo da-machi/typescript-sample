@@ -69,11 +69,13 @@ jobs:
             name=$(echo "$row" | jq -r '.name')
             message=$(echo "$row" | jq -r '.message')
 
-            # エラーメッセージから ts ファイルの行番号情報を抽出（例: test/foo.test.ts:12:34）
-            loc=$(echo "$message" | grep -Eo '[^ ]+\.ts:[0-9]+:[0-9]+' | sed -E 's|.*/(test/[^:]+:[0-9]+:[0-9]+)|\1|' | head -n 1)
-
-            # 抽出できなければ補足表示
-            if [ -z "$loc" ]; then
+            # フルパス中の ts ファイル位置を抽出
+            loc=$(echo "$message" | grep -Eo '[^ ]+\.ts:[0-9]+:[0-9]+' | head -n 1)
+            
+            # フルパス → 相対パスに変換（GITHUB_WORKSPACE を除去）
+            if [ -n "$loc" ]; then
+              loc=$(echo "$loc" | sed "s|$GITHUB_WORKSPACE/||")
+            else
               loc="（位置情報なし）"
             fi
 
