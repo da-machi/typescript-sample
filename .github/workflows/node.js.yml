@@ -42,26 +42,28 @@ jobs:
           echo "All tests passed! 🎉" > result.md
         else
           echo "## ❌ Failed Tests" > result.md
-          echo "| Test Name | Location |" >> result.md
-          echo "| --------- | -------- |" >> result.md
+          echo "| Suite (Describe) | Test Name | File | Location |" >> result.md
+          echo "| ---------------- | --------- | ---- | -------- |" >> result.md
+    
           jq -r '
             .testResults[]
-            | select(.status == "failed")
+            | .testFilePath as $file
             | .assertionResults[]
             | select(.status=="failed")
             | [
-                "| " + .fullName
-                + " | "
-                + (if .location == null then "（場所情報なし）" else (.location | tostring) end)
-                + " |"
+                (.ancestorTitles | join(" > ")),
+                .fullName,
+                $file,
+                (if .location == null then "（場所情報なし）" else (.location | tostring) end)
               ]
             | @tsv
-          ' jest-results.json >> result.md
+          ' jest-results.json | while IFS=$'\t' read -r suite name file loc; do
+            echo "| $suite | $name | $file | $loc |" >> result.md
+          done
     
-          # locationフィールドがnullになることがある旨の注釈を追加
           echo "" >> result.md
-          echo "> ※ Location列はテストの実行ファイル上の行・列情報を示しますが、" >> result.md
-          echo "> 一部の環境や設定によってはこの情報が取得できず「（場所情報なし）」と表示される場合があります。" >> result.md
+          echo "> ※ Location列はテスト内の行・列情報を示しますが、" >> result.md
+          echo "> 一部の環境（例: ts-jestなど）では取得できず「（場所情報なし）」と表示されることがあります。" >> result.md
         fi
         echo "summary_file=result.md" >> $GITHUB_OUTPUT
   
