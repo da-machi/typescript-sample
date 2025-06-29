@@ -11,40 +11,48 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # コードをリポジトリからチェックアウト
+    # コードをリポジトリからチェックアウト（mainブランチ対象）
     - uses: actions/checkout@v4
 
-    # Node.js 18 をセットアップし、npmキャッシュを有効化
+    # Node.js 18 をセットアップし、npm の依存キャッシュを有効化
     - name: Use Node.js 18
       uses: actions/setup-node@v4
       with:
         node-version: 18
         cache: 'npm'
 
-    # 依存関係をインストール（package-lock.jsonを元に厳密インストール）
+    # npm の依存関係を package-lock.json に従ってインストール
     - run: npm ci
 
-    # ビルド処理があれば実行
+    # ビルドスクリプトがあれば実行（無ければスキップ）
     - run: npm run build --if-present
 
-    # JestをJSON出力付きで実行
-    # テスト失敗時もジョブを止めず、後続で処理可能にするため '|| true' を付与
+    # Jest を JSON 出力付きで実行
+    # テスト失敗時も exit 1 にせず後続処理を継続（|| true により強制成功扱い）
     - name: Run Jest with JSON output
       run: npx jest --json --outputFile=jest-results.json || true
 
-    # テスト結果JSONから失敗テストの一覧をMarkdown形式で生成し、result.mdに保存
-    # 失敗が無ければ「All tests passed! 🎉」だけを記載
-    # また、GITHUB_OUTPUTにファイル名を出力して後続ステップへ渡す
+    # 失敗したテストがある場合、GitHub Actions のログに警告メッセージを出力
+    - name: Warn if tests failed
+      run: |
+        FAILED=$(jq '.numFailedTests' jest-results.json)
+        if [ "$FAILED" -gt 0 ]; then
+          echo "::warning::There are $FAILED failed test(s)."
+        fi
+
+    # Jest の出力（jest-results.json）から失敗テスト情報を抽出し Markdown を生成
     - name: Show test summary in job summary
       id: summary
       run: |
         if [ $(jq '.numFailedTests' jest-results.json) -eq 0 ]; then
           echo "All tests passed! 🎉" > result.md
         else
+          # Markdown テーブルのヘッダーを記述
           echo "## ❌ Failed Tests" > result.md
           echo "| Suite (Describe) | Test Name | File:Line |" >> result.md
           echo "| ---------------- | --------- | --------- |" >> result.md
-    
+
+          # 失敗テスト1件ずつ処理
           jq -c '
             .testResults[]
             | .testFilePath as $file
@@ -56,44 +64,44 @@ jobs:
                 message: (.failureMessages | join("\n"))
               }
           ' jest-results.json | while read -r row; do
+            # 各項目を抽出
             suite=$(echo "$row" | jq -r '.suite')
             name=$(echo "$row" | jq -r '.name')
             message=$(echo "$row" | jq -r '.message')
-    
-            # フルパス中の ts ファイル位置を抽出し、相対パスに変換
-            loc=$(echo "$message" | grep -Eo '[^ ]+\.ts:[0-9]+:[0-9]+' | head -n 1)
-    
-            # 相対パス（test/から始まる）に変換
-            loc=$(echo "$loc" | sed -E 's|.*/(test/[^:]+:[0-9]+:[0-9]+)|\1|')
-    
-            # ヒットしなければ補足メッセージ
+
+            # エラーメッセージから ts ファイルの行番号情報を抽出（例: test/foo.test.ts:12:34）
+            loc=$(echo "$message" | grep -Eo '[^ ]+\.ts:[0-9]+:[0-9]+' | sed -E 's|.*/(test/[^:]+:[0-9]+:[0-9]+)|\1|' | head -n 1)
+
+            # 抽出できなければ補足表示
             if [ -z "$loc" ]; then
               loc="（位置情報なし）"
             fi
-    
+
+            # テーブル行として出力
             printf "| %s | %s | %s |\n" "$suite" "$name" "$loc" >> result.md
           done
-    
+
+          # テーブル下部に注釈コメントを追加
           echo "" >> result.md
           echo "> ※ File:Line列はテスト失敗時のソースコード上の相対パス（ファイル:行:列）を出力します。" >> result.md
           echo "> Jestのエラーメッセージから抽出しているため、正確な位置が得られない場合もあります。" >> result.md
         fi
-    
+
+        # 後続ステップへの出力変数として result.md のパスを指定
         echo "summary_file=result.md" >> $GITHUB_OUTPUT
- 
-    # 生成したMarkdownファイルをアーティファクトとして保存（必要に応じて）
+
+    # 生成した Markdown をアーティファクトとして保存（必要に応じてダウンロード可能）
     - name: Upload job summary
       uses: actions/upload-artifact@v4
       with:
         name: jest-summary
         path: result.md
 
-    # GitHub ActionsのジョブサマリーにMarkdown内容を反映
+    # GitHub Actions の UI 上に Markdown の内容をジョブサマリーとして表示
     - name: Add job summary markdown to GitHub UI
       uses: actions/github-script@v6
       with:
         script: |
-          // GitHub Actionsのcoreモジュールはグローバル提供されているので require 不要
           const fs = require('fs');
           const summary = fs.readFileSync('result.md', 'utf8');
           core.summary.addRaw(summary).write();
