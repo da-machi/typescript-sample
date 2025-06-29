@@ -16,4 +16,8 @@ describe('addNumbers', () => {
   test('小数の加算', () => {
     expect(addNumbers(1.5, 2.3)).toBeCloseTo(3.8);
   });
+
+    test('意図して失敗するケース 0の加算', () => {
+    expect(addNumbers(0, 0)).toBe(10);
+  });
 });
