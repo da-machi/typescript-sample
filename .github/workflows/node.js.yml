@@ -49,12 +49,22 @@ jobs:
             | select(.status == "failed")
             | .assertionResults[]
             | select(.status=="failed")
-            | ["| " + .fullName + " | " + (.location | tostring) + " |"]
+            | [
+                "| " + .fullName
+                + " | "
+                + (if .location == null then "（場所情報なし）" else (.location | tostring) end)
+                + " |"
+              ]
             | @tsv
           ' jest-results.json >> result.md
+    
+          # locationフィールドがnullになることがある旨の注釈を追加
+          echo "" >> result.md
+          echo "> ※ Location列はテストの実行ファイル上の行・列情報を示しますが、" >> result.md
+          echo "> 一部の環境や設定によってはこの情報が取得できず「（場所情報なし）」と表示される場合があります。" >> result.md
         fi
         echo "summary_file=result.md" >> $GITHUB_OUTPUT
-
+  
     # 生成したMarkdownファイルをアーティファクトとして保存（必要に応じて）
     - name: Upload job summary
       uses: actions/upload-artifact@v4
