@@ -42,34 +42,33 @@ jobs:
           echo "All tests passed! 🎉" > result.md
         else
           echo "## ❌ Failed Tests" > result.md
-          echo "| Suite (Describe) | Test Name | File | Location |" >> result.md
-          echo "| ---------------- | --------- | ---- | -------- |" >> result.md
+          echo "| Suite (Describe) | Test Name | File:Line |" >> result.md
+          echo "| ---------------- | --------- | --------- |" >> result.md
     
           jq -r '
             .testResults[]
-            | .testFilePath as $file
             | .assertionResults[]
             | select(.status=="failed")
-            | [
-                (.ancestorTitles | join(" > ")),
-                .fullName,
-                $file,
-                (if .location == null then "（場所情報なし）" else (.location | tostring) end)
-              ]
-            | @json
-          ' jest-results.json | while read -r row; do
-            suite=$(echo "$row" | jq -r '.[0]')
-            name=$(echo "$row" | jq -r '.[1]')
-            file=$(echo "$row" | jq -r '.[2]')
-            loc=$(echo "$row" | jq -r '.[3]')
-            printf "| %s | %s | %s | %s |\n" "$suite" "$name" "$file" "$loc" >> result.md
+            | {
+                suite: (.ancestorTitles | join(" > ")),
+                name: .fullName,
+                location: (
+                  .failureMessages[]
+                  | capture("(?<file>[^:]+\\.ts):(\\d+):(\\d+)")
+                  | "\(.file):\(.string | split(\":\") | .[1]):\(.string | split(\":\") | .[2])"
+                )
+              }
+          ' jest-results.json | jq -s '.[]' | while read -r line; do
+            suite=$(echo "$line" | jq -r '.suite')
+            name=$(echo "$line" | jq -r '.name')
+            loc=$(echo "$line" | jq -r '.location')
+            printf "| %s | %s | %s |\n" "$suite" "$name" "$loc" >> result.md
           done
     
           echo "" >> result.md
-          echo "> ※ Location列はテスト内の行・列情報を示しますが、" >> result.md
-          echo "> 一部の環境（例: ts-jestなど）では取得できず「（場所情報なし）」と表示されることがあります。" >> result.md
+          echo "> ※ File:Line列はテスト失敗時のソースコード上の位置（ファイル:行:列）を出力します。" >> result.md
+          echo "> Jestの出力メッセージから抽出しているため、正確な位置が得られない場合もあります。" >> result.md
         fi
-    
         echo "summary_file=result.md" >> $GITHUB_OUTPUT
   
     # 生成したMarkdownファイルをアーティファクトとして保存（必要に応じて）
