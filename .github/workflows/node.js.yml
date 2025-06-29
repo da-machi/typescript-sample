@@ -35,8 +35,9 @@ jobs:
         echo "## ❌ Failed Tests" > result.md
         # 失敗テストがなければその旨を出力
         if [ $(jq '.numFailedTests' jest-results.json) -eq 0 ]; then
-          echo "All tests passed! 🎉" >> result.md
+          echo "All tests passed! 🎉" > result.md
         else
+          echo "## ❌ Failed Tests" > result.md
           echo "| Test Name | Location |" >> result.md
           echo "| --------- | -------- |" >> result.md
           jq -r '
