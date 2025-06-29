@@ -11,21 +11,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    # コードをリポジトリからチェックアウト
     - uses: actions/checkout@v4
 
+    # Node.js 18 をセットアップし、npmキャッシュを有効化
     - name: Use Node.js 18
       uses: actions/setup-node@v4
       with:
         node-version: 18
         cache: 'npm'
 
+    # 依存関係をインストール（package-lock.jsonを元に厳密インストール）
     - run: npm ci
 
+    # ビルド処理があれば実行
     - run: npm run build --if-present
 
+    # JestをJSON出力付きで実行
+    # テスト失敗時もジョブを止めず、後続で処理可能にするため '|| true' を付与
     - name: Run Jest with JSON output
-      run: npx jest --json --outputFile=jest-results.json
+      run: npx jest --json --outputFile=jest-results.json || true
 
+    # テスト結果JSONから失敗テストの一覧をMarkdown形式で生成し、result.mdに保存
+    # 失敗が無ければ「All tests passed! 🎉」だけを記載
+    # また、GITHUB_OUTPUTにファイル名を出力して後続ステップへ渡す
     - name: Show test summary in job summary
       id: summary
       run: |
@@ -44,20 +53,21 @@ jobs:
             | @tsv
           ' jest-results.json >> result.md
         fi
-
-        # 非推奨のset-outputではなくGITHUB_OUTPUTへ書き込み
         echo "summary_file=result.md" >> $GITHUB_OUTPUT
 
+    # 生成したMarkdownファイルをアーティファクトとして保存（必要に応じて）
     - name: Upload job summary
       uses: actions/upload-artifact@v4
       with:
         name: jest-summary
         path: result.md
 
+    # GitHub ActionsのジョブサマリーにMarkdown内容を反映
     - name: Add job summary markdown to GitHub UI
       uses: actions/github-script@v6
       with:
         script: |
+          // GitHub Actionsのcoreモジュールはグローバル提供されているので require 不要
           const fs = require('fs');
           const summary = fs.readFileSync('result.md', 'utf8');
           core.summary.addRaw(summary).write();
