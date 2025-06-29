@@ -9,3 +9,9 @@ module.exports = {
     ...tsJestTransformCfg,
   },
 };
+
+// jest.config.js
+module.exports = {
+  verbose: true, // 各テスト名を詳細に表示
+  testResultsProcessor: "jest-sonar-reporter" // ← 任意でレポート出力
+};
