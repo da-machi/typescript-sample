@@ -47,29 +47,37 @@ jobs:
     
           jq -r '
             .testResults[]
+            | .testFilePath as $file
             | .assertionResults[]
             | select(.status=="failed")
             | {
                 suite: (.ancestorTitles | join(" > ")),
                 name: .fullName,
-                location: (
-                  .failureMessages[]
-                  | capture("(?<file>[^:]+\\.ts):(\\d+):(\\d+)")
-                  | "\(.file):\(.string | split(\":\") | .[1]):\(.string | split(\":\") | .[2])"
-                )
+                message: (.failureMessages | join("\n"))
               }
-          ' jest-results.json | jq -s '.[]' | while read -r line; do
-            suite=$(echo "$line" | jq -r '.suite')
-            name=$(echo "$line" | jq -r '.name')
-            loc=$(echo "$line" | jq -r '.location')
+          ' jest-results.json | jq -s '.[]' | while read -r row; do
+            suite=$(echo "$row" | jq -r '.suite')
+            name=$(echo "$row" | jq -r '.name')
+            message=$(echo "$row" | jq -r '.message')
+    
+            # 行番号の正規表現にヒットする最初の1行を抽出（例: __test__/service.test.ts:21:30）
+            loc=$(echo "$message" | grep -Eo '[^ ]+\.ts:[0-9]+:[0-9]+' | head -n 1)
+    
+            # ヒットしなければ補足メッセージ
+            if [ -z "$loc" ]; then
+              loc="（位置情報なし）"
+            fi
+    
             printf "| %s | %s | %s |\n" "$suite" "$name" "$loc" >> result.md
           done
     
           echo "" >> result.md
           echo "> ※ File:Line列はテスト失敗時のソースコード上の位置（ファイル:行:列）を出力します。" >> result.md
-          echo "> Jestの出力メッセージから抽出しているため、正確な位置が得られない場合もあります。" >> result.md
+          echo "> Jestのエラーメッセージから抽出しているため、正確な位置が得られない場合もあります。" >> result.md
         fi
+    
         echo "summary_file=result.md" >> $GITHUB_OUTPUT
+
   
     # 生成したMarkdownファイルをアーティファクトとして保存（必要に応じて）
     - name: Upload job summary
