@@ -11,23 +11,58 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [18.0]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
     steps:
     - uses: actions/checkout@v4
-    - name: Use Node.js ${{ matrix.node-version }}
+
+    - name: Use Node.js 18
       uses: actions/setup-node@v4
       with:
-        node-version: ${{ matrix.node-version }}
+        node-version: 18
         cache: 'npm'
+
     - run: npm ci
-    # add
-    - run: npm install --save-dev jest-sonar-reporter
+
     - run: npm run build --if-present
-    - run: npm test
+
+    - name: Run Jest with JSON output
+      run: npx jest --json --outputFile=jest-results.json
+
+    - name: Show test summary in job summary
+      id: summary
+      run: |
+        echo "## ❌ Failed Tests" > result.md
+        # 失敗テストがなければその旨を出力
+        if [ $(jq '.numFailedTests' jest-results.json) -eq 0 ]; then
+          echo "All tests passed! 🎉" >> result.md
+        else
+          echo "| Test Name | Location |" >> result.md
+          echo "| --------- | -------- |" >> result.md
+          jq -r '
+            .testResults[]
+            | select(.status == "failed")
+            | .assertionResults[]
+            | select(.status=="failed")
+            | ["| " + .fullName + " | " + (.location | tostring) + " |"]
+            | @tsv
+          ' jest-results.json >> result.md
+        fi
+        # ジョブサマリーにMarkdownを追加
+        cat result.md
+        echo "::notice file=result.md::$(cat result.md)"
+        echo "::set-output name=summary_file::result.md"
+
+    - name: Upload job summary
+      uses: actions/upload-artifact@v4
+      with:
+        name: jest-summary
+        path: result.md
+
+    - name: Add job summary markdown to GitHub UI
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const summary = fs.readFileSync('result.md', 'utf8');
+          core.summary.addRaw(summary).write();
