@@ -69,8 +69,8 @@ jobs:
             name=$(echo "$row" | jq -r '.name')
             message=$(echo "$row" | jq -r '.message')
 
-            # フルパス中の ts ファイル位置を抽出
-            loc=$(echo "$message" | grep -Eo '[^ ]+\.ts:[0-9]+:[0-9]+' | head -n 1)
+            # フルパス中の ts ファイル位置を抽出（括弧を除去）
+            loc=$(echo "$message" | grep -Eo '[^ ]+\.ts:[0-9]+:[0-9]+' | head -n 1 | sed 's/[()]//g')
             
             # フルパス → 相対パスに変換（GITHUB_WORKSPACE を除去）
             if [ -n "$loc" ]; then
